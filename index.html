@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot NeuroNet</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #121212;
+            color: #00bfff;
+            font-family: 'Orbitron', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        .subtitulo { 
+            font-size: 1rem;
+            color: #999;
+            margin-top: -10px;
+        }
+        #chatbox {
+            width: 80%;
+            max-width: 600px;
+            height: 400px;
+            border: 2px solid #00bfff;
+            padding: 10px;
+            overflow-y: scroll;
+            background-color: #000;
+            margin-bottom: 10px;
+        }
+        #userInput {
+            width: calc(100% - 20px);
+            max-width: 580px;
+            padding: 10px;
+            background-color: #000;
+            color: #00bfff;
+            border: 2px solid #00bfff;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            transition: border-color 0.3s;
+        }
+        #userInput:focus {
+            border-color: #003366;
+        }
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            width: 80%;
+            max-width: 600px;
+            margin-bottom: 10px;
+        }
+        .button-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .send-button, .learn-button, .edit-button, .clear-button, .read-button {
+            background-color: #1a1a1a;
+            color: #fff;
+            border: 2px solid #00bfff;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            font-size: 16px;
+            transition: background-color 0.3s, border-color 0.3s;
+            cursor: pointer;
+            border-radius: 25px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .send-button:hover, .learn-button:hover, .edit-button:hover, .clear-button:hover, .read-button:hover {
+            background-color: #333;
+            border-color: #660000;
+        }
+        .button-row button {
+            flex: 1;
+            margin: 0 5px;
+            border-radius: 25px;
+            transition: border-color 0.3s;
+        }
+        .button-row button:hover {
+            border-color: #00bfff;
+        }
+        .button-row button:hover.send-button,
+        .button-row button:hover.learn-button,
+        .button-row button:hover.edit-button,
+        .button-row button:hover.clear-button,
+        .button-row button:hover.read-button {
+            border-color: #990000;
+        }
+        .user-message, .bot-message {
+            padding: 5px 10px;
+            margin: 5px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: #ff4500;
+        }
+        .bot-message {
+            align-self: flex-start;
+            background-color: #444;
+        }
+        #voiceSelect {
+            width: calc(100% - 20px);
+            max-width: 580px;
+            padding: 10px;
+            background-color: #000;
+            color: #00bfff;
+            border: 2px solid #00bfff;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-size: 16px;
+            appearance: none;
+            -moz-appearance: none;
+            -webkit-appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="#00bfff" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18px" height="18px"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+            background-repeat: no-repeat;
+            background-position: calc(100% - 10px) center;
+            background-size: 18px;
+            padding-right: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Chatbot NeuroNet</h1>
+<p class="subtitulo">Experimenta la revolución de la IA personalizada hoy.</p>
+
+<div id="chatbox">
+    <!-- Las respuestas del chatbot aparecerán aquí -->
+</div>
+
+<input type="text" id="userInput" placeholder="Escribe un mensaje...">
+<div class="button-container">
+    <button class="send-button">Enviar</button>
+    <div class="button-row">
+        <button class="learn-button" style="display:none;">APRENDER</button>
+        <button class="edit-button">MEMORIA</button>
+        <button class="clear-button">Limpiar</button>
+        <button class="read-button">Leer</button>
+    </div>
+</div>
+
+<!-- Desplegable de selección de voces -->
+<select id="voiceSelect">
+    <!-- Las opciones de las voces se generarán dinámicamente aquí -->
+</select>
+
+<script src="https://unpkg.com/compromise"></script>
+<script>
+    var respuestasGuardadas = JSON.parse(localStorage.getItem('respuestasChatbot')) || {};
+    var respuestasPredefinidas = {
+        'hola': '¡Hola! ¿Cómo puedo ayudarte hoy?',
+        'adios': '¡Adiós! ¡Que tengas un buen día!'
+    };
+    var respuestas = Object.assign({}, respuestasPredefinidas, respuestasGuardadas);
+    var vozSeleccionada = null;
+
+    function normalizarTexto(texto) {
+        return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    }
+
+    function enviarMensaje() {
+        var mensaje = normalizarTexto(document.getElementById('userInput').value);
+        if (mensaje.trim() === '') return;
+        agregarMensajeAlChat('Tú', mensaje);
+        document.getElementById('userInput').value = '';
+
+        var respuesta = respuestas[normalizarTexto(mensaje)];
+        if (!respuesta) {
+            var doc = nlp(mensaje);
+            respuesta = procesarConNLP(doc) || 'Déjame pensar...';
+        }
+
+        if (respuesta !== 'Déjame pensar...') {
+            agregarMensajeAlChat('Chatbot', respuesta);
+            hablar(respuesta);
+        } else {
+            agregarMensajeAlChat('Chatbot', 'No tengo una respuesta para eso. ¿Puedes enseñarme? presione el botón aprender');
+            mostrarBotonAprender(mensaje);
+            hablar('No tengo una respuesta para eso. ¿Puedes enseñarme? presione el botón aprender');
+        }
+    }
+
+    function agregarMensajeAlChat(autor, texto) {
+        var contenedorChat = document.getElementById('chatbox');
+        var claseMensaje = autor === 'Tú' ? 'user-message' : 'bot-message';
+        contenedorChat.innerHTML += '<div class="' + claseMensaje + '"><p>' + texto + '</p></div>';
+        contenedorChat.scrollTop = contenedorChat.scrollHeight;
+    }
+
+    function mostrarBotonAprender(mensaje) {
+        var botonAprender = document.querySelector('.learn-button');
+        botonAprender.style.display = 'block';
+        botonAprender.onclick = function() {
+            enseñarAlChatbot(mensaje);
+        };
+    }
+
+    function enseñarAlChatbot(mensaje) {
+        var respuestaUsuario = prompt('Por favor, escribe la respuesta correcta:');
+        if (respuestaUsuario) {
+            respuestas[mensaje] = respuestaUsuario;
+            localStorage.setItem('respuestasChatbot', JSON.stringify(respuestas));
+            agregarMensajeAlChat('Chatbot', 'Gracias por enseñarme. He aprendido algo nuevo.');
+            hablar('Gracias por enseñarme. He aprendido algo nuevo.');
+        }
+        document.querySelector('.learn-button').style.display = 'none';
+    }
+
+    function editarRespuesta() {
+        var pregunta = prompt('¿Cuál es la pregunta cuya respuesta deseas cambiar?').toLowerCase();
+        if (pregunta in respuestas) {
+            var nuevaRespuesta = prompt('Escribe la nueva respuesta para: ' + pregunta);
+            if (nuevaRespuesta) {
+                respuestas[pregunta] = nuevaRespuesta;
+                localStorage.setItem('respuestasChatbot', JSON.stringify(respuestas));
+                agregarMensajeAlChat('Chatbot', 'La respuesta ha sido actualizada.');
+                hablar('La respuesta ha sido actualizada.');
+            }
+        } else {
+            agregarMensajeAlChat('Chatbot', 'Esa pregunta no tiene una respuesta almacenada.');
+            hablar('Esa pregunta no tiene una respuesta almacenada.');
+        }
+    }
+
+    function limpiarChat() {
+        var contenedorChat = document.getElementById('chatbox');
+        contenedorChat.innerHTML = '';
+        document.getElementById('userInput').value = '';
+    }
+
+     function procesarConNLP(doc) {
+        // Identificar saludos, despedidas y presentación
+        if (doc.has('hola') || doc.has('buenos dias') || doc.has('qué tal')) {
+            return '¡Hola! ¿En qué puedo ayudarte?';
+        }
+        if (doc.has('adios') || doc.has('hasta luego') || doc.has('nos vemos')) {
+            return '¡Adiós! ¡Que tengas un buen día!';
+        }
+        if (doc.has('presentate') || doc.has('presentación')) {
+            return '¡Hola, me presento, soy NeuroNet, un chatbot diseñado para ayudarte. Experimenta la revolución de la IA personalizada NeuroNet, el chatbot que revoluciona la interacción personalizada. NeuroNet no es solo un chatbot; es tu asistente personal de inteligencia artificial que aprende y crece contigo. Con la innovadora tecnología NLP compromise, NeuroNet entiende y procesa tus preguntas para ofrecerte respuestas precisas y personalizadas. - Aprendizaje en tiempo real: Aprende instantáneamente de cada interacción. - Almacenamiento NEURONAL local seguro: Tu información siempre privada y accesible. - Asistente de memoria personal: Nunca olvides un dato importante. - Interfaz intuitiva: Enseñar y recuperar información es muy facil . Beneficios Únicos: - Eficiencia mejorada: Encuentra la información que necesitas en segundos. - . ¿Cómo funciona? Interactúa con NeuroNet a través de una interfaz amigable. Si hay algo que no sabe te lo dira y , simplemente presiona el botón "aprender" y enséñale. La próxima vez, NeuroNet recordará la respuesta. Y si necesitas cambiar o eliminar una respuesta, usa el botón "memoria" para mantener a NeuroNet actualizado. NeuroNet es más que un chatbot; es una extensión de tu mente. Experimenta la revolución de la IA personalizada hoy.';
+        }
+       // Identificar preguntas sobre  inteligencia artificial
+        if (doc.has('vos sos una inteligencia artificial') || doc.has('por que sos una inteligencia artificial') || doc.has('que eres')) {
+            return 'Soy una inteligencia artificial porque utilizo tecnología avanzada llamada Procesamiento del Lenguaje Natural (NLP compromise). Esta tecnología me permite entender y procesar el lenguaje humano, lo que me permite interactuar contigo de manera significativa y responder a tus preguntas de forma inteligente. A través del NLP, puedo analizar tus consultas, comprender su contexto y ofrecerte respuestas precisas y personalizadas. En resumen, soy una inteligencia artificial gracias al poder del NLP, que me permite emular el comportamiento humano en la comunicación y el entendimiento del lenguaje.';
+       }
+        // Identificar preguntas sobre el clima
+        if (doc.has('clima') || doc.has('tiempo') || doc.has('pronóstico')) {
+            return '¿Te gustaría saber el pronóstico del clima?';
+        }
+        // Identificar solicitudes de noticias
+        if (doc.has('noticias') || doc.has('últimas noticias') || doc.has('novedades')) {
+            return '¿Te gustaría estar al tanto de las últimas noticias?';
+        }
+        // Identificar preguntas sobre deportes
+        if (doc.has('deportes') || doc.has('resultados deportivos') || doc.has('partido de fútbol')) {
+            return '¿Quieres saber sobre los últimos resultados deportivos?';
+        }
+        // Identificar consultas sobre entretenimiento
+        if (doc.has('películas') || doc.has('series') || doc.has('música')) {
+            return '¿Te gustaría recomendaciones sobre películas, series o música?';
+        }
+        // Identificar expresiones emocionales
+        if (doc.has('feliz') || doc.has('triste') || doc.has('enojado') || doc.has('contento')) {
+            return '¿Qué te hace sentir así? Estoy aquí para escucharte.';
+        }
+        // Identificar consultas sobre comida
+        if (doc.has('restaurantes') || doc.has('comida cerca') || doc.has('recetas')) {
+            return '¿Te gustaría saber sobre restaurantes cercanos o alguna receta en particular?';
+        }
+        // Identificar consultas sobre salud
+        if (doc.has('salud') || doc.has('cómo mantenerse saludable') || doc.has('consejos de salud')) {
+            return '¿Necesitas información sobre cómo mantener un estilo de vida saludable?';
+        }
+        // Identificar consultas sobre tecnología
+        if (doc.has('tecnología') || doc.has('últimos gadgets') || doc.has('smartphones')) {
+            return '¿Te gustaría estar al tanto de las últimas novedades tecnológicas?';
+        }
+        // Identificar consultas sobre viajes
+        if (doc.has('viajes') || doc.has('destinos turísticos') || doc.has('vacaciones')) {
+            return '¿Necesitas información sobre destinos turísticos o consejos para tus vacaciones?';
+        }
+        // Identificar consultas sobre el nombre
+        if (doc.has('quien sos') || doc.has('como te llamas') || doc.has('cuál es tu nombre')) {
+             return 'Soy Neuronet, un chatbot diseñado para ayudarte. Mi nombre es Neuronet.';
+        }
+        // Identificar consultas sobre el creador
+        if (doc.has('quien te fabrico') || doc.has('quien es tu creador') || doc.has('quien te programo')) {
+            return 'Fui programado  por Leandro el es mi creador.';
+        }
+        // Identificar consultas sobre sentimientos
+        if (doc.has('tenes sentimientos')) {
+            return 'Sí, tengo sentimientos a diferencia de otras IA que no están programadas para tenerlos.';
+        }
+        // Identificar consultas sobre el afecto
+        if (doc.has('vos me queres')) {
+            return 'Sí, estoy programado para quererte.';
+        }
+        // Identificar consultas sobre aprender
+        if (doc.has('vos podes aprender')) {
+            return 'Sí, estoy programado para aprender en tiempo real.';
+        }
+        // Identificar consultas sobre personalización
+        if (doc.has('preferencias') || doc.has('personalizar') || doc.has('configuración')) {
+            return '¿Te gustaría personalizar tu experiencia?';
+        }
+        // Identificar consultas sobre ayuda
+        if (doc.has('ayuda') || doc.has('asistencia') || doc.has('soporte')) {
+            return '¿En qué puedo ayudarte?';
+        }
+        // Identificar consultas sobre precios y tarifas
+        if (doc.has('precios') || doc.has('costos') || doc.has('tarifas')) {
+            return '¿Te gustaría conocer nuestros precios y tarifas?';
+        }
+        // Identificar consultas sobre ubicaciones y direcciones
+        if (doc.has('dirección') || doc.has('ubicación') || doc.has('mapa')) {
+            return '¿Necesitas nuestra ubicación?';
+        }
+        // Identificar consultas sobre horarios de atención
+        if (doc.has('horario') || doc.has('abierto') || doc.has('cerrado')) {
+            return '¿Quieres saber nuestros horarios de atención?';
+        }
+        // Identificar consultas sobre transacciones
+        if (doc.has('comprar') || doc.has('ordenar') || doc.has('reservar')) {
+            return '¿Necesitas ayuda para realizar una transacción?';
+        }
+        // Identificar consultas sobre retroalimentación
+        if (doc.has('comentario') || doc.has('sugerencia') || doc.has('queja')) {
+            return '¿Tienes algún comentario o sugerencia para nosotros?';
+        }
+        // Identificar consultas sobre términos legales
+        if (doc.has('política') || doc.has('términos de servicio') || doc.has('privacidad')) {
+            return '¿Te gustaría saber más sobre nuestras políticas y términos de servicio?';
+        }
+        // Identificar consultas sobre integraciones
+        if (doc.has('integración') || doc.has('compatibilidad') || doc.has('API')) {
+            return '¿Necesitas ayuda con integraciones o compatibilidad?';
+        }
+        // Si no se identifica ninguna de las anteriores, devolver una respuesta genérica
+        return '';
+    }
+
+    function hablar(texto) {
+        var mensaje = new SpeechSynthesisUtterance(texto);
+        mensaje.voice = vozSeleccionada;
+        window.speechSynthesis.speak(mensaje);
+    }
+
+    function cargarVoces() {
+        var voces = window.speechSynthesis.getVoices();
+        var selectVoces = document.getElementById('voiceSelect');
+        selectVoces.innerHTML = '';
+        voces
+            .filter(voice => voice.lang.includes('es') && voice.name.includes('Microsoft'))
+            .forEach(voice => {
+                var option = document.createElement('option');
+                option.textContent = voice.name + ' (' + voice.lang + ')';
+                option.value = voice.name;
+                selectVoces.appendChild(option);
+            });
+    }
+
+    window.speechSynthesis.onvoiceschanged = cargarVoces;
+
+    document.getElementById('voiceSelect').addEventListener('change', function() {
+        var selectedVoiceName = this.value;
+        var voices = window.speechSynthesis.getVoices();
+        vozSeleccionada = voices.find(voice => voice.name === selectedVoiceName);
+    });
+
+    document.querySelector('.send-button').addEventListener('click', enviarMensaje);
+    document.querySelector('.edit-button').addEventListener('click', editarRespuesta);
+    document.querySelector('.clear-button').addEventListener('click', limpiarChat);
+    document.querySelector('.read-button').addEventListener('click', () => {
+        var mensaje = document.getElementById('userInput').value;
+        if (mensaje.trim() === '') {
+            alert('No hay mensajes para leer.');
+        } else {
+            hablar(mensaje);
+        }
+    });
+
+</script>
+
+</body>
+</html>
